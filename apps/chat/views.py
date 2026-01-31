@@ -3,12 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from apps.chat.models import Message, Room
-from apps.chat.serializer import MessageSerializer, RoomSerializer
+from apps.chat.serializers import MessageSerializer, RoomSerializer
 
 
 class StandardPageSize(PageNumberPagination):
     page_size = 10
-    page_size_query_param = page_size
+    page_size_query_param = "page_size"
     max_page_size = 30
 
 
