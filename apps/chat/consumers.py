@@ -1,6 +1,10 @@
 import json
 
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.contrib.auth.models import AnonymousUser
+
+from apps.chat.models import Message, Room
 
 
 class EchoConsumer(AsyncJsonWebsocketConsumer):
@@ -41,16 +45,49 @@ class RoomChatConsumer(AsyncJsonWebsocketConsumer):
             return
 
         payload = json.loads(text_data)
-        message = payload.get("message", "")
+        content = (payload.get("message") or "").strip()
+        if not content:
+            return
+
+        if (
+            isinstance(self.scope.get("user"), AnonymousUser)
+            or not self.scope["user"].is_autneticated
+        ):
+            await self.send(
+                text_data=json.dumps(
+                    {"type": "error", "message": "authentication required"}
+                )
+            )
+            return
+
+        message = await self._save_message(
+            room_id=self.room_id,
+            user_id=self.scope["user"].id,
+            content=content,
+        )
 
         await self.channel_layer.group_send(
             self.group_name,
             {
                 "type": "chat.message",
                 "room_id": self.room_id,
-                "message": message,
+                "message_id": message["id"],
+                "message": message["content"],
+                "sender_id": message["sender_id"],
+                "created_at": message["created_at"],
             },
         )
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event))
+
+    @database_sync_to_async
+    def _save_message(self, room_id: int, user_id: int, content: str) -> dict:
+        room = Room.objects.get(id=room_id)
+        message = Message.objects.create(room=room, sender_id=user_id, content=content)
+        return {
+            "id": message.id,
+            "content": message.content,
+            "sender_id": message.sender_id,
+            "created_at": message.created_at.isoformat(),
+        }
