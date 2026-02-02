@@ -27,8 +27,20 @@ class RoomChatConsumer(AsyncJsonWebsocketConsumer):
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.group_name = f"room_{self.room_id}"
 
+        user = self.scope.get("user")
+        if not user or isinstance(user, AnonymousUser) or not user.is_authenticated:
+            await self.close(code=4401)
+            return
+
         if not await self._room_exists(self.room_id):
             await self.close(code=4404)
+            return
+
+        is_member = await self._is_room_member(
+            room_id=int(self.room_id), user_id=user.id
+        )
+        if not is_member:
+            await self.close(code=4403)
             return
 
         await self.accept()
@@ -122,6 +134,12 @@ class RoomChatConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def _room_exists(self, room_id: int) -> bool:
         return Room.objects.filter(id=room_id).exists()
+
+    @database_sync_to_async
+    def _is_room_member(self, room_id: int, user_id: int) -> bool:
+        from apps.chat.models import RoomMember
+
+        return RoomMember.objects.filter(room_id=room_id, user_id=user_id).exists()
 
     @database_sync_to_async
     def _save_message(self, room_id: int, user_id: int, content: str) -> dict:

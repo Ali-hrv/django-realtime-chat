@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h3>WS Test</h3>
+<input id="msg" placeholder="message"/>
+<button id="send">Send</button>
+<pre id="log"></pre>
+
+<script>
+    const roomId = 1;
+    const log = (m) => (document.getElementById("log").textContent += m + "\n");
+
+    const wsScheme = location.protocol === "https:" ? "wss" : "ws";
+
+    const chat = new WebSocket(`${wsScheme}://${location.host}/ws/chat/rooms/${roomId}/`);
+    chat.onopen = () => log("chat connected");
+    chat.onmessage = (e) => log("chat: " + e.data);
+    chat.onerror = () => log("chat error");
+    chat.onclose = (e) => log(`chat closed code=${e.code} reason="${e.reason}" wasClean=${e.wasClean}`);
+
+    document.getElementById("send").onclick = () => {
+        const v = document.getElementById("msg").value;
+        chat.send(JSON.stringify({message: v}));
+    };
+
+    const notif = new WebSocket(`${wsScheme}://${location.host}/ws/notifications/`);
+    notif.onopen = () => log("notif connected");
+    notif.onmessage = (e) => log("notif: " + e.data);
+    notif.onerror = () => log("notif error");
+    notif.onclose = (e) => log(`notif closed code=${e.code} reason="${e.reason}" wasClean=${e.wasClean}`);
+</script>
+</body>
+</html>
